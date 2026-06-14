@@ -1,0 +1,6 @@
+{
+  "name": "Oistarians - AI Shopping Assistant",
+  "description": "An AI-powered conversational recommender chatbot and strategy terminal utilizing Gemini.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
