@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { TrendingUp, Coins, Clock, Users, BarChart3, Settings, ShieldCheck, Check, Sparkles, RefreshCw, Layers, Database } from "lucide-react";
-import { Product, ActiveDomain } from "../types";
+import { TrendingUp, Coins, Clock, Users, BarChart3, Settings, ShieldCheck, Check, Sparkles, RefreshCw, Layers, Database, FileDown, Trash2 } from "lucide-react";
+import { Product, ActiveDomain, DeploymentRecord } from "../types";
 import { PRODUCTS_CATALOG } from "../productsData";
 
 interface DashboardProps {
   activeDomain: ActiveDomain;
+  deployments: DeploymentRecord[];
+  onClearDeployments: () => void;
 }
 
-export default function Dashboard({ activeDomain }: DashboardProps) {
+export default function Dashboard({ activeDomain, deployments, onClearDeployments }: DashboardProps) {
   const [botTone, setBotTone] = useState<"strategic" | "informative" | "friendly">("strategic");
   const [includeExplanations, setIncludeExplanations] = useState(true);
   const [enableSmartReRank, setEnableSmartReRank] = useState(true);
@@ -279,6 +281,148 @@ export default function Dashboard({ activeDomain }: DashboardProps) {
 
         </div>
 
+      </div>
+
+      {/* FULL WIDTH: ADMINISTRATIVE DEPLOYMENT HISTORY LOGS */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-80 h-32 bg-brand-blue/5 blur-3xl rounded-full pointer-events-none" />
+        
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4 mb-5 relative z-10">
+          <div>
+            <h3 className="text-sm font-display font-medium text-slate-100 flex items-center gap-2">
+              <Database size={16} className="text-brand-mint" />
+              Administrative Deployment Audit Ledger
+            </h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Authorized documentation of all automated recommendations mobilized or deployed into Asterion combat coordinates.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 shrink-0">
+            {deployments.length > 0 && (
+              <button
+                onClick={onClearDeployments}
+                className="text-xs text-rose-400 hover:text-white hover:bg-rose-950/20 border border-rose-950/40 px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 font-mono"
+                title="Wipe administrative memory feed"
+              >
+                <Trash2 size={13} />
+                Clear Ledger
+              </button>
+            )}
+            
+            <button
+              onClick={() => {
+                if (deployments.length === 0) return;
+                // Headers
+                const headers = ["Deployment ID", "Timestamp", "Unit / Product Name", "Faction / Category", "Cost / Price", "Specifications", "Status"];
+                
+                // Rows
+                const rows = deployments.map(dep => [
+                  dep.id,
+                  dep.timestamp,
+                  `"${dep.productName.replace(/"/g, '""')}"`,
+                  dep.category.toUpperCase(),
+                  dep.price,
+                  `"${dep.specs.replace(/"/g, '""')}"`,
+                  dep.status.toUpperCase()
+                ]);
+
+                const csvContent = [
+                  headers.join(","),
+                  ...rows.map(row => row.join(","))
+                ].join("\n");
+
+                const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.setAttribute("download", `oistarian_deployment_logs_${new Date().toISOString().split('T')[0]}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+              disabled={deployments.length === 0}
+              className={`text-xs font-semibold px-4 py-2 bg-brand-mint hover:bg-white text-slate-950 border border-brand-mint hover:border-white rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-40 disabled:hover:bg-brand-mint disabled:hover:text-slate-950 disabled:cursor-not-allowed`}
+            >
+              <FileDown size={14} />
+              Export CSV Ledger
+            </button>
+          </div>
+        </div>
+
+        {/* LOGS TABLE / CARD LIST */}
+        <div className="relative z-10 overflow-hidden rounded-xl border border-slate-800 bg-slate-950/60 shadow-inner">
+          {deployments.length === 0 ? (
+            <div className="p-8 text-center text-slate-500 space-y-2">
+              <Database className="mx-auto text-slate-750 animate-pulse" size={32} />
+              <p className="text-xs font-mono">No active deployment telemetry recorded in logs.</p>
+              <p className="text-[10px] text-slate-400">Deploy tactical units from the AI Recommender Chatbot panel to populate new coordinates.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-900/80 border-b border-slate-800 text-[9px] uppercase font-mono tracking-wider text-slate-400">
+                    <th className="py-3 px-4">Log ID</th>
+                    <th className="py-3 px-4">Timestamp</th>
+                    <th className="py-3 px-4">Tactical Unit / Product</th>
+                    <th className="py-3 px-4">Faction / Category</th>
+                    <th className="py-3 px-4 text-right">Budget Value</th>
+                    <th className="py-3 px-4 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/65 text-slate-300 font-mono text-[11px]">
+                  {deployments.map((log) => (
+                    <tr key={log.id} className="hover:bg-slate-900/30 transition-colors">
+                      <td className="py-3 px-4 text-brand-blue font-bold">{log.id}</td>
+                      <td className="py-3 px-4 text-slate-400">
+                        {new Date(log.timestamp).toLocaleString(undefined, {
+                          month: "short",
+                          day: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit"
+                        })}
+                      </td>
+                      <td className="py-3 px-4 font-sans font-medium text-slate-200">
+                        <div>
+                          <div>{log.productName}</div>
+                          <div className="text-[10px] text-slate-500 font-mono mt-0.5 max-w-sm truncate" title={log.specs}>{log.specs}</div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-0.5 rounded text-[9px] border font-semibold ${
+                          log.category === "oistaria"
+                            ? "bg-[#1e1333]/50 text-[#cfb7f5] border-[#cfb7f5]/20"
+                            : log.category === "electronics"
+                            ? "bg-brand-blue/10 text-brand-blue border-brand-blue/20"
+                            : "bg-indigo-950/30 text-indigo-300 border-indigo-900/30"
+                        }`}>
+                          {log.category.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right text-slate-100 font-bold">
+                        {log.category === "oistaria" ? `⚡ ${log.price} Eth` : `€${log.price}`}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
+                          log.status === "active"
+                            ? "bg-brand-mint/10 text-brand-mint"
+                            : "bg-brand-blue/15 text-brand-blue"
+                        }`}>
+                          <span className={`w-1 h-1 rounded-full ${
+                            log.status === "active" ? "bg-brand-mint animate-pulse" : "bg-brand-blue"
+                          }`} />
+                          {log.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
     </div>

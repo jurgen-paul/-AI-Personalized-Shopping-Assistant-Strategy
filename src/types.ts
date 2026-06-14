@@ -1,3 +1,13 @@
+export interface DeploymentRecord {
+  id: string;
+  timestamp: string;
+  productName: string;
+  category: string;
+  price: number;
+  specs: string;
+  status: "dispatched" | "active" | "standby";
+}
+
 export interface Product {
   id: string;
   name: string;

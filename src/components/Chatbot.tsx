@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Send, Sparkles, ThumbsUp, ThumbsDown, Trash2, Shield, Circle, Database, Star, Check, HelpCircle } from "lucide-react";
+import { Send, Sparkles, ThumbsUp, ThumbsDown, Trash2, Shield, Circle, Database, Star, Check, HelpCircle, Volume2, VolumeX } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Message, Product, ExtractedPreferences, ActiveDomain } from "../types";
 import { PRODUCTS_CATALOG } from "../productsData";
@@ -46,11 +46,82 @@ export default function Chatbot({ activeDomain, setActiveDomain, onRecommendedPr
     constraints: ["Ais-powered Search"]
   });
 
+  const [autoNarrate, setAutoNarrate] = useState(false);
+  const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
+
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    return () => {
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (autoNarrate && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg.role === "assistant") {
+        speakMessage(lastMsg);
+      }
+    }
+  }, [messages, autoNarrate]);
+
+  const speakMessage = (msg: Message) => {
+    if (!("speechSynthesis" in window)) {
+      console.warn("Speech synthesis is not supported on this browser.");
+      return;
+    }
+
+    if (speakingMsgId === msg.id) {
+      window.speechSynthesis.cancel();
+      setSpeakingMsgId(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+
+    let textToSpeak = msg.content;
+    if (msg.recommendedProducts && msg.recommendedProducts.length > 0) {
+      textToSpeak += ". Here are the specifics of my recommendations: ";
+      msg.recommendedProducts.forEach((rec, idx) => {
+        const localProd = PRODUCTS_CATALOG[activeDomain]?.find(p => p.id === rec.id);
+        if (localProd) {
+          textToSpeak += `Recommendation ${idx + 1}. The ${localProd.name}. reason to deploy: ${rec.reason}. `;
+        }
+      });
+    }
+
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.volume = 1.0;
+    utterance.rate = 1.0;
+    utterance.pitch = 0.85;
+
+    const voices = window.speechSynthesis.getVoices();
+    const premiumVoice = voices.find(v =>
+      v.name.toLowerCase().includes("google") ||
+      v.name.toLowerCase().includes("natural") ||
+      v.name.toLowerCase().includes("male")
+    );
+    if (premiumVoice) {
+      utterance.voice = premiumVoice;
+    }
+
+    utterance.onend = () => {
+      setSpeakingMsgId(null);
+    };
+    utterance.onerror = () => {
+      setSpeakingMsgId(null);
+    };
+
+    setSpeakingMsgId(msg.id);
+    window.speechSynthesis.speak(utterance);
+  };
 
   const handleSendMessage = async (textToSend: string) => {
     if (!textToSend.trim() || isLoading) return;
@@ -116,6 +187,10 @@ export default function Chatbot({ activeDomain, setActiveDomain, onRecommendedPr
   };
 
   const clearChat = () => {
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    setSpeakingMsgId(null);
     setMessages([
       {
         id: "welcome",
@@ -191,6 +266,27 @@ export default function Chatbot({ activeDomain, setActiveDomain, onRecommendedPr
                 </button>
               ))}
             </div>
+
+            <button 
+              onClick={() => {
+                if (autoNarrate) {
+                  window.speechSynthesis.cancel();
+                  setSpeakingMsgId(null);
+                }
+                setAutoNarrate(!autoNarrate);
+              }}
+              title={autoNarrate ? "Disable Auto-Read Aloud" : "Enable Auto-Read Aloud"}
+              className={`p-2 rounded-lg transition-colors border flex items-center gap-1.5 text-xs ${
+                autoNarrate 
+                  ? "bg-brand-mint/10 text-brand-mint border-brand-mint/30" 
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800 border-slate-800"
+              }`}
+            >
+              <Volume2 size={15} className={autoNarrate ? "animate-pulse text-brand-mint" : ""} />
+              <span className="hidden sm:inline font-mono text-[9px] uppercase tracking-wider font-semibold">
+                {autoNarrate ? "Narrative Play" : "Narrative Mute"}
+              </span>
+            </button>
 
             <button 
               onClick={clearChat}
@@ -283,22 +379,52 @@ export default function Chatbot({ activeDomain, setActiveDomain, onRecommendedPr
                   <div className="flex items-center gap-3 mt-1.5 px-1.5 text-[10px] text-slate-500">
                     <span>{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     
-                    {msg.role === "assistant" && msg.id !== "welcome" && (
-                      <div className="flex items-center gap-1.5 border-l border-slate-800 pl-3">
-                        <button 
-                          onClick={() => handleFeedback(msg.id, "like")}
-                          className={`hover:text-brand-mint transition-colors ${msg.feedback === "like" ? "text-brand-mint font-bold" : ""}`}
-                          title="Accurate recommendation"
+                    {msg.role === "assistant" && (
+                      <div className="flex items-center gap-2.5 border-l border-slate-800 pl-3">
+                        <button
+                          onClick={() => speakMessage(msg)}
+                          className={`flex items-center gap-1 hover:text-brand-mint transition-colors ${
+                            speakingMsgId === msg.id ? "text-brand-mint font-semibold animate-pulse" : ""
+                          }`}
+                          title={speakingMsgId === msg.id ? "Stop reading" : "Read recommendation out loud"}
                         >
-                          <ThumbsUp size={11} />
+                          {speakingMsgId === msg.id ? (
+                            <>
+                              <VolumeX size={11} className="text-brand-mint" />
+                              <span className="text-[9px] font-mono">Stop Synth</span>
+                              <div className="flex items-end gap-[1.5px] h-2.5">
+                                <span className="w-[1.5px] bg-brand-mint rounded-full h-full animate-[pulse_0.4s_infinite_alternate]" />
+                                <span className="w-[1.5px] bg-brand-mint rounded-full h-[60%] animate-[pulse_0.6s_infinite_alternate]" />
+                                <span className="w-[1.5px] bg-brand-mint rounded-full h-[80%] animate-[pulse_0.5s_infinite_alternate]" />
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <Volume2 size={11} />
+                              <span className="text-[9px] font-mono">Speak</span>
+                            </>
+                          )}
                         </button>
-                        <button 
-                          onClick={() => handleFeedback(msg.id, "dislike")}
-                          className={`hover:text-rose-400 transition-colors ${msg.feedback === "dislike" ? "text-rose-400 font-bold" : ""}`}
-                          title="Irrelevant suggestion"
-                        >
-                          <ThumbsDown size={11} />
-                        </button>
+
+                        {msg.id !== "welcome" && (
+                          <>
+                            <span className="text-slate-800">|</span>
+                            <button 
+                              onClick={() => handleFeedback(msg.id, "like")}
+                              className={`hover:text-brand-mint transition-colors ${msg.feedback === "like" ? "text-brand-mint font-bold" : ""}`}
+                              title="Accurate recommendation"
+                            >
+                              <ThumbsUp size={11} />
+                            </button>
+                            <button 
+                              onClick={() => handleFeedback(msg.id, "dislike")}
+                              className={`hover:text-rose-400 transition-colors ${msg.feedback === "dislike" ? "text-rose-400 font-bold" : ""}`}
+                              title="Irrelevant suggestion"
+                            >
+                              <ThumbsDown size={11} />
+                            </button>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>

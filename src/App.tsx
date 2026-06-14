@@ -1,14 +1,55 @@
 import { useState } from "react";
 import { Sparkles, Swords, BarChart3, Bell, Terminal, ShoppingBag, X, Check, Award } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { PanelView, Product, ActiveDomain } from "./types";
+import { PanelView, Product, ActiveDomain, DeploymentRecord } from "./types";
 import Chatbot from "./components/Chatbot";
 import Dashboard from "./components/Dashboard";
 import Tabletop from "./components/Tabletop";
 
+const INITIAL_DEPLOYMENTS: DeploymentRecord[] = [
+  {
+    id: "DEP-9041",
+    timestamp: "2026-06-12T10:15:00Z",
+    productName: "Oistarian Phalanx Mech-Shield",
+    category: "oistaria",
+    price: 1500,
+    specs: "Core Ether alloy cladding, Shock flippant protection",
+    status: "active"
+  },
+  {
+    id: "DEP-8720",
+    timestamp: "2026-06-13T14:30:22Z",
+    productName: "Sovereign-Class Quantum Server",
+    category: "electronics",
+    price: 3200,
+    specs: "256 Qubit cryogenic logical unit, 10kW draw",
+    status: "active"
+  },
+  {
+    id: "DEP-7182",
+    timestamp: "2026-06-14T01:05:11Z",
+    productName: "Concord Ranger Recon Drone",
+    category: "oistaria",
+    price: 1200,
+    specs: "Ultralight carbon mainframe, laser designator",
+    status: "dispatched"
+  }
+];
+
 export default function App() {
   const [activePanel, setActivePanel] = useState<PanelView>("assistant");
   const [activeDomain, setActiveDomain] = useState<ActiveDomain>("electronics");
+  
+  // Deployment history tracking with local storage persistence
+  const [deployments, setDeployments] = useState<DeploymentRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem("oistarian_deployments");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn("Could not retrieve oistarian_deployments from localStorage", e);
+    }
+    return INITIAL_DEPLOYMENTS;
+  });
   
   // Custom interactive notifications instead of iframe-unfriendly alert() calls
   const [alertNotification, setAlertNotification] = useState<{
@@ -25,6 +66,24 @@ export default function App() {
 
   // Action hook triggered when deploying a weapon/product
   const handleDeployProduct = (prod: Product) => {
+    const newRecord: DeploymentRecord = {
+      id: `DEP-${Math.floor(1000 + Math.random() * 9000)}`,
+      timestamp: new Date().toISOString(),
+      productName: prod.name,
+      category: activeDomain,
+      price: prod.price,
+      specs: prod.specs,
+      status: "dispatched"
+    };
+
+    const updated = [newRecord, ...deployments];
+    setDeployments(updated);
+    try {
+      localStorage.setItem("oistarian_deployments", JSON.stringify(updated));
+    } catch (e) {
+      console.warn("localStorage set failed:", e);
+    }
+
     setAlertNotification({
       show: true,
       title: "Tactical Weapon Deployed",
@@ -120,7 +179,18 @@ export default function App() {
             )}
             
             {activePanel === "dashboard" && (
-              <Dashboard activeDomain={activeDomain} />
+              <Dashboard 
+                activeDomain={activeDomain} 
+                deployments={deployments}
+                onClearDeployments={() => {
+                  setDeployments([]);
+                  try {
+                    localStorage.setItem("oistarian_deployments", JSON.stringify([]));
+                  } catch (e) {
+                    console.warn(e);
+                  }
+                }}
+              />
             )}
             
             {activePanel === "tabletop" && (
